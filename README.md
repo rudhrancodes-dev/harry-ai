@@ -1,59 +1,79 @@
 <div align="center">
 
-![Harry banner](docs/screenshots/banner.png)
+<img src="assets/harry-icon-1024.png" width="180" alt="Harry logo">
 
-# Harry
+# Harry · Intelligence
 
-**Voice-only agentic AI — JARVIS / FRIDAY-style — with a Hermes-style orchestrator, 98-skill catalogue, computer-use agent, and a pluggable LLM brain.**
+**Voice-only agentic AI for macOS — JARVIS / FRIDAY-style — with a pixel-perfect React orb UI, Hermes-style orchestrator, 98-skill catalogue, computer-use agent, bilingual EN+TA voice, Obsidian-vault memory, and a pluggable LLM brain.**
 
 [![Python](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Brain: Claude Pro · OpenRouter · OpenAI-compat](https://img.shields.io/badge/brain-pluggable-7c3aed.svg)](#brain-backends)
 [![98 skills](https://img.shields.io/badge/skills-98%20unique%20triggers-22d3ee.svg)](#the-98-skill-catalogue)
-[![Voice only](https://img.shields.io/badge/interface-voice%20only-22d3ee.svg)](#)
+[![macOS .app + DMG](https://img.shields.io/badge/macOS-.app%20%2B%20DMG-0a0e1a.svg)](#install)
 
 </div>
 
 ---
 
-Harry is a Tony-Stark-style personal AI. **You only speak to it. It only speaks back.** No typing, no chat window, no buttons. If Harry mishears you, it asks again — politely — until it's confident enough to act.
+## Install
 
-Under the hood, a **Hermes-style orchestrator** routes each utterance to the best specialist agent: a clock, weather, mac system control, computer-use (cursor / type / scroll), a code-writing agent that drops files in your workspace, a 98-skill catalogue with strictly non-overlapping keyword triggers, and finally a free-form conversation agent that runs through whichever LLM brain you pick.
+**The one-liner** — clones, sets up a venv, installs Harry, runs onboarding, builds the `.app`:
 
-## Demo
-
-![Terminal demo](docs/screenshots/demo.png)
-
-> *(Microphone input and TTS output happen out-of-band — the terminal is just the trace of what Harry heard, which agent answered, and what it said back.)*
-
-## Architecture
-
-![Architecture diagram](docs/screenshots/architecture.png)
-
-```mermaid
-flowchart LR
-    Mic[🎤 Microphone] --> Listener[STT Listener<br/>text + confidence]
-    Listener --> Wake{wake word<br/>+ confidence?}
-    Wake -- no --> Reask[Re-ask politely]
-    Reask --> Listener
-    Wake -- yes --> Orch[Orchestrator<br/>Hermes-style router]
-    Orch --> Time[⏰ Time]
-    Orch --> Weather[🌦 Weather]
-    Orch --> System[🖥 System]
-    Orch --> Computer[🖱 Computer Use]
-    Orch --> Code[👨‍💻 Code Writer]
-    Orch --> Skills[🧰 Hermes Skills × 98]
-    Orch --> Conv[💬 Conversation]
-    Skills --> Brain
-    Code --> Brain
-    Conv --> Brain[🧠 Brain<br/>Claude Pro · OpenRouter · OpenAI-compat]
-    Time & Weather & System & Computer & Code & Skills & Conv --> Speaker[🔊 TTS]
-    Speaker --> User[👤 User]
+```bash
+curl -sSL https://raw.githubusercontent.com/rudhrancodes-dev/harry-ai/main/install.sh | bash
 ```
 
-## Brain backends
+After it finishes, launch in either way:
 
-Harry doesn't lock you into one provider. Pick a backend by setting **`HARRY_BRAIN`** in your `.env`:
+```bash
+harry                    # CLI (opens the UI in your browser)
+open ~/Applications/Harry.app    # native double-click
+```
+
+**Already cloned?**
+
+```bash
+pip install -e .
+harry-onboard --yes
+harry
+```
+
+**Want the desktop app only?** Grab `Harry.dmg` from the [Releases page](https://github.com/rudhrancodes-dev/harry-ai/releases), mount it, drag `Harry.app` to `/Applications`. It still expects the install location at `~/Apps/harry-ai` (run the one-liner first).
+
+---
+
+## What it is
+
+Harry is a real Tony-Stark-style assistant. **You speak to it. It speaks back.** A pixel-perfect React orb UI sits on top of a Python backend that runs the Hermes-style agent stack. Pluggable brains, bilingual voice, persistent memory in an Obsidian vault, runtime brain-switching from the Settings drawer.
+
+| | |
+| --- | --- |
+| 🪄 **Wake greeting** | Time-aware, personalised — "Burning the midnight oil, Rudhran?" / "மீண்டும் வருக, ருத்ரன்." |
+| 🗣 **Bilingual** | English + Tamil. Auto-detects per utterance. macOS `say -v Daniel` / `Vani` for TTS. |
+| 🔁 **Brain switcher** | Claude Pro · OpenRouter (DeepSeek V3) · OpenAI-compatible (opencode/Ollama). Switch live in the Settings drawer, no restart. |
+| 🎙 **Speaker ID** | Optional voiceprint verification — `harry-enroll` records you reading 10 prompts, after that only your voice unlocks Harry. |
+| 🧠 **Memory** | Obsidian vault at `~/Documents/HarryVault`. Every turn lands in `Sessions/YYYY-MM-DD.md`. Open it in Obsidian. |
+| 🖱 **Computer use** | Click / move / type / scroll your actual cursor. `cliclick` + AppleScript. |
+| 🧰 **98 skills** | Globally unique trigger phrases, enforced by tests. Dice, calculator, screenshot, recipes, regex, weather, etc. |
+| 💻 **Code agent** | "Harry, code python that reverses a string into reverse.py" → file appears in `~/.harry/workspace/`. |
+
+## The UI
+
+The frontend is the **Harry · Intelligence** design (Claude Design export, ~2300 lines of HTML/CSS/JSX) embedded as-is in `webapp/`. Three orb styles (Jarvis particle sphere, iridescent sphere, waveform), three themes (Solaris, Iridescent, Obsidian), a tweaks panel, transcript drawer, agent log, drag-to-reposition orb. A non-invasive `settings-patch.jsx` injects a brain-backend dropdown into the existing Settings drawer without touching `app.jsx`.
+
+Demo:
+
+| State | |
+| :--- | :--- |
+| Idle | *"Good morning, Rudhran. Standing by."* |
+| Wake | *"I'm listening."* |
+| Listening | live STT caption with confidence |
+| Thinking | *"One moment, Rudhran."* |
+| Tool | active tool card + agent log (top right) |
+| Speaking | live caption of Harry's reply |
+
+## Brain backends
 
 | Backend         | What it does                                                            | What it needs                                              |
 | --------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------- |
@@ -62,146 +82,98 @@ Harry doesn't lock you into one provider. Pick a backend by setting **`HARRY_BRA
 | `openai-compat` | Any OpenAI-compatible endpoint — **opencode**, Ollama, vLLM, DeepSeek direct, Groq, Together, LM Studio. | `OPENCODE_API_KEY` (if needed), `OPENCODE_BASE_URL`, `OPENCODE_MODEL`. |
 | `off`           | Disable the LLM entirely; only deterministic skills will work.          | nothing.                                                   |
 
-The brain is invoked by `ConversationAgent`, `CodeAgent`, and any of the 98 skills marked `handler="llm"`. Everything else (calculator, dice, screenshot, battery, etc.) runs without a model.
+**Switch at runtime** from the Settings drawer (cogwheel, lower right). The backend writes your choice to `.env` and reloads the orchestrator on the next turn — no restart needed.
 
-## The 98-skill catalogue
-
-`harry.skills.registry` defines exactly **98 narrow skills** across 10 categories. **Every trigger phrase in the catalogue is globally unique** — there are no overlapping keywords between skills. The test suite (`tests/test_skills.py`) enforces this as a build invariant:
-
-```python
-def test_every_trigger_is_globally_unique():
-    triggers = [t for s in SKILLS for t in s.triggers]
-    dupes = [k for k, v in Counter(t.lower() for t in triggers).items() if v > 1]
-    assert not dupes
-```
-
-Categories:
-
-| Category        | Count | Examples                                                       |
-| --------------- | :---: | -------------------------------------------------------------- |
-| `info`          | 10    | calculator · dictionary · timezone-lookup · thesaurus          |
-| `creative`      | 10    | joke · story · poem · haiku · plot-twist · metaphor            |
-| `productivity`  | 10    | reminder · timer · pomodoro · todo · note · brainstorm         |
-| `comm`          |  8    | email-draft · text-draft · translate · paraphrase · proofread  |
-| `knowledge`     | 10    | eli5 · trivia · math-solve · physics · chemistry · biology     |
-| `code`          |  8    | code-snippet · debug · regex · git-help · algorithm            |
-| `system`        |  8    | close-app · volume · brightness · screenshot · lock-screen · battery |
-| `health`        |  8    | workout · recipe · meditation · breathing · sleep-tip · stretch |
-| `ent`           |  8    | movie · book · music · game · anime · podcast · tv · fun-fact  |
-| `math`          |  8    | percent · tip · age · distance · °C↔°F · kg↔lb · roman · binary |
-| `social`        | 10    | compliment · motivation · affirmation · apology · thank-you · coin · dice |
-| **Total**       | **98**|                                                                |
-
-**Routing**: the `HermesSkillAgent` sorts all triggers by length descending, then picks the longest one that appears in the utterance — so *"convert celsius to fahrenheit"* always beats a shorter trigger that might be a prefix of something else.
-
-## Tools beyond chat
-
-### 🖱 Computer Use agent
-```
-"harry, click at 480 320"
-"harry, type out hello world"
-"harry, press key return"
-"harry, scroll down by 5"
-"harry, move cursor to 100 200"
-```
-Uses [`cliclick`](https://github.com/BlueM/cliclick) for precision when installed (`brew install cliclick`), AppleScript otherwise. macOS only for now.
-
-### 👨‍💻 Code-writing agent
-```
-"harry, code python that reverses a string into reverse.py"
-"harry, code javascript that debounces a function into debounce.js"
-"harry, code bash that finds large files into find_big.sh"
-```
-Routes the request to the configured Brain, strips fences, and writes the result into `~/.harry/workspace/`. Refuses to write anything outside that sandbox.
-
-### 🎨 Personalisation
-```bash
-HARRY_USER_NAME=Rudhran            # who Harry is talking to
-HARRY_ADDRESS=sir                  # how Harry should address you
-HARRY_PERSONA_EXTRA="Reference Tamil engineering jokes when natural."
-```
-Pulled in by `harry/persona.py` and injected into every LLM call as the system prompt.
-
-## Quick start
+## Speaker recognition
 
 ```bash
-git clone https://github.com/rudhrancodes-dev/harry-ai.git
-cd harry-ai
-
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-cp .env.example .env          # pick HARRY_BRAIN and (if needed) paste a key
-python main.py
+pip install -e ".[speakerid]"     # installs resemblyzer (~150 MB torch dep)
+harry-enroll                       # reads 10 prompts, builds your voiceprint
 ```
 
-Then say:
+The profile lives at `~/.harry/voiceprint.npy`. Once enrolled, the listener rejects voices below cosine similarity `HARRY_SPEAKER_THRESHOLD` (default 0.78). When not enrolled, verification is a no-op so Harry still works for anyone.
 
-> *"Harry, what time is it?"*
-> *"Harry, tell a joke."*
-> *"Harry, calculate 47 times 92."*
-> *"Harry, roll a dice."*
-> *"Harry, take a screenshot."*
-> *"Harry, code python that prints fibonacci into fib.py."*
-> *"Harry, explain how isolation forests detect anomalies."*
+## Memory in an Obsidian vault
+
+First launch creates `~/Documents/HarryVault/` with:
+
+```
+HarryVault/
+├── .obsidian/app.json
+├── README.md
+├── Sessions/
+│   └── 2026-05-26.md       ← today, appended each turn with frontmatter
+└── People/
+    └── Rudhran.md           ← long-lived facts Harry learns about you
+```
+
+Open the folder as a vault in Obsidian (`Open folder as vault…`). Harry can recall the last session into the conversation context for continuity.
+
+## The 98 skills
+
+`harry/skills/registry.py` defines exactly **98 skills**. **Every trigger phrase is globally unique** — `tests/test_skills.py` fails the build if uniqueness ever regresses.
+
+Eleven categories: info · creative · productivity · comm · knowledge · code · system · health · ent · math · social.
 
 ## Project layout
 
 ```
 harry-ai/
-├── main.py                       # voice loop entry point
+├── webapp/                            # the Claude-Design React UI (embedded as-is)
+│   ├── index.html
+│   ├── app.css · app.jsx · orb.jsx · tweaks-panel.jsx
+│   ├── greetings.js                   # English pool (yours)
+│   ├── greetings-ta.js                # Tamil pool (added)
+│   ├── greetings-bilingual.js         # selector glue
+│   ├── harry-bridge.js                # WebSocket client → /ws
+│   └── settings-patch.jsx             # injects brain-switcher into Settings
 ├── harry/
-│   ├── config.py                 # env-loaded settings
-│   ├── persona.py                # personalisable system prompt
-│   ├── brain/                    # pluggable LLM backends
-│   │   ├── claude_code.py        #   uses `claude` CLI → Claude Pro
-│   │   ├── openrouter.py         #   uses OpenRouter (DeepSeek, ...)
-│   │   └── openai_compat.py      #   opencode, Ollama, vLLM, ...
+│   ├── server.py                      # FastAPI app — static UI + /api/* + /ws
+│   ├── cli.py                         # `harry` — opens browser, runs server
+│   ├── onboard.py                     # `harry-onboard` — first-run setup
+│   ├── enroll.py                      # `harry-enroll` — voiceprint enrollment
+│   ├── greetings.py                   # Python-side bilingual greeting picker
+│   ├── memory.py                      # Obsidian vault writer / reader
+│   ├── persona.py
+│   ├── config.py
+│   ├── brain/                         # pluggable LLM backends
 │   ├── voice/
-│   │   ├── listener.py           # STT + confidence
-│   │   └── speaker.py            # TTS
-│   ├── agents/
-│   │   ├── base.py               # Agent ABC
-│   │   ├── orchestrator.py       # Hermes-style router
-│   │   ├── time_agent.py
-│   │   ├── weather_agent.py
-│   │   ├── system_agent.py
-│   │   ├── computer_agent.py     # CUA — click / type / scroll
-│   │   ├── code_agent.py         # writes files to ~/.harry/workspace
-│   │   └── conversation_agent.py # free-form fallback
-│   └── skills/
-│       ├── registry.py           # 98 Skill definitions
-│       ├── handlers.py           # deterministic handlers (no LLM)
-│       └── agent.py              # HermesSkillAgent — longest-match router
-├── tests/
-│   ├── test_orchestrator.py
-│   └── test_skills.py            # catalogue invariants (unique triggers etc.)
-├── docs/
-│   ├── generate_screenshots.py
-│   └── screenshots/{banner,architecture,demo}.png
-├── requirements.txt
-├── .env.example
-└── LICENSE
+│   │   ├── listener.py                # bilingual STT (en-IN + ta-IN)
+│   │   ├── speaker.py                 # bilingual TTS (Daniel / Vani)
+│   │   └── speaker_id.py              # resemblyzer voiceprint verifier
+│   ├── agents/                        # time / weather / system / computer / code / conversation
+│   └── skills/                        # 98-skill catalogue + Hermes router
+├── scripts/
+│   ├── make-icon.py                   # generates the iridescent Harry logo
+│   └── build-app.sh                   # builds Harry.app + Harry.dmg
+├── assets/
+│   └── harry-icon-1024.png
+├── install.sh                         # one-line installer
+├── pyproject.toml                     # console scripts: harry · harry-onboard · harry-enroll
+├── tests/                             # 10 passing: orchestrator + catalogue invariants
+└── dist/                              # Harry.app + Harry.dmg (built, gitignored)
 ```
 
-## Configuration reference
+## Configuration
 
-| Env var                | Default                          | Notes                                          |
-| ---------------------- | -------------------------------- | ---------------------------------------------- |
-| `HARRY_BRAIN`          | `claude-code`                    | `claude-code` · `openrouter` · `openai-compat` · `off` |
-| `OPENROUTER_API_KEY`   | *(empty)*                        | required for `openrouter`                      |
-| `OPENROUTER_MODEL`     | `deepseek/deepseek-chat-v3-0324` | any OpenRouter model id                        |
-| `OPENCODE_API_KEY`     | *(empty)*                        | optional for local endpoints                   |
-| `OPENCODE_BASE_URL`    | `http://localhost:11434/v1`      | Ollama-style default                           |
-| `OPENCODE_MODEL`       | `deepseek-chat`                  | model id at that endpoint                      |
-| `HARRY_USER_NAME`      | *(empty)*                        | your name, used in persona                     |
-| `HARRY_ADDRESS`        | `sir`                            | how Harry should address you                   |
-| `HARRY_PERSONA_EXTRA`  | *(empty)*                        | extra persona sentences                        |
-| `HARRY_WAKE_WORD`      | `harry`                          | set to empty to disable wake-word gating       |
-| `HARRY_STT_ENERGY`     | `300`                            | mic energy threshold for VAD                   |
-| `HARRY_STT_PAUSE`      | `0.8`                            | seconds of silence that ends an utterance      |
-| `HARRY_MAX_CLARIFY`    | `2`                              | how many times Harry will re-ask               |
-| `OPENWEATHER_API_KEY`  | *(optional)*                     | enables the weather agent                      |
+Set via `.env` (project root) or `~/.config/harry/.env` (after `harry-onboard`). The Settings drawer writes the same keys live.
+
+| Env var                 | Default                          |
+| ----------------------- | -------------------------------- |
+| `HARRY_BRAIN`           | `claude-code`                    |
+| `HARRY_LANGUAGE`        | `en` (`en` · `ta` · `auto`)      |
+| `HARRY_USER_NAME`       | `Rudhran`                        |
+| `HARRY_ADDRESS`         | `sir`                            |
+| `HARRY_WAKE_WORD`       | `harry`                          |
+| `HARRY_VAULT`           | `~/Documents/HarryVault`         |
+| `HARRY_HOST`            | `127.0.0.1`                      |
+| `HARRY_PORT`            | `7424`                           |
+| `HARRY_SPEAKER_THRESHOLD` | `0.78`                         |
+| `OPENROUTER_API_KEY`    | *(empty)*                        |
+| `OPENROUTER_MODEL`      | `deepseek/deepseek-chat-v3-0324` |
+| `OPENCODE_API_KEY`      | *(empty)*                        |
+| `OPENCODE_BASE_URL`     | `http://localhost:11434/v1`      |
+| `OPENCODE_MODEL`        | `deepseek-chat`                  |
 
 ## Running tests
 
@@ -209,24 +181,24 @@ harry-ai/
 python -m pytest -q
 ```
 
-The suite covers orchestrator routing **and** the 98-skill catalogue invariants — uniqueness of every trigger phrase, uniqueness of skill ids, that every handler is registered, and that every LLM-routed skill has a prompt.
+Covers orchestrator routing **and** the 98-skill catalogue invariants — uniqueness of every trigger phrase, uniqueness of ids, every handler registered, every LLM skill has a prompt.
 
 ## Roadmap
 
-- [ ] Swap Google STT for local `faster-whisper`
-- [ ] Persistent conversation memory (SQLite or vector store)
+- [ ] Streaming TTS so Harry speaks before generation completes
 - [ ] Native tool-use API on each Brain backend (true function calling)
-- [ ] Streaming TTS so Harry can start speaking before generation finishes
 - [ ] Cross-platform Computer Agent (Windows / Linux via `pyautogui`)
 - [ ] Hot-reload skill packs from `~/.harry/skills/*.py`
+- [ ] Vector memory layer over the Obsidian vault for semantic recall
+- [ ] Whisper local STT (replace SpeechRecognition's Google backend)
 
-## Inspiration
+## Credits
 
-- **JARVIS** & **FRIDAY** — Tony Stark's assistants in the MCU
-- **NousResearch Hermes** — orchestrator + tool-use architecture
-- **Claude Code** — the `claude` CLI is what makes the Pro-plan brain backend possible
-- **opencode**, **Ollama**, **OpenRouter**, **DeepSeek** — the open ecosystem behind the pluggable brain
-- **Aegis** — my earlier ML-on-the-edge anomaly-detection project ([rudhran.netlify.app](https://rudhran.netlify.app))
+- **Design** — your own export from [Claude Design](https://claude.ai/design), embedded verbatim
+- **Brain** — Anthropic Claude (via the `claude` CLI), DeepSeek, OpenRouter, opencode
+- **Voiceprint** — [Resemblyzer](https://github.com/resemble-ai/Resemblyzer)
+- **Hermes pattern** — [NousResearch Hermes](https://github.com/NousResearch)
+- **Inspiration** — JARVIS & FRIDAY (Iron Man), Aegis ([rudhran.netlify.app](https://rudhran.netlify.app))
 
 ## License
 
