@@ -72,25 +72,29 @@ def make_architecture() -> None:
     box(60, 380, 240, 90, "Wake & Clarify", "wake word + re-ask loop", "#22d3ee")
 
     box(420, 260, 320, 110, "Orchestrator", "Hermes-style router", "#f59e0b")
-    box(420, 410, 320, 90, "Brain  (Claude)", "anthropic SDK + prompt cache", "#a855f7")
+    box(420, 410, 320, 90, "Brain  (pluggable)", "Claude Pro · OpenRouter · OpenAI-compat", "#a855f7")
 
-    box(820, 140, 220, 80, "Time Agent", "clock / date / day", "#34d399")
-    box(820, 240, 220, 80, "Weather Agent", "OpenWeather API", "#34d399")
-    box(820, 340, 220, 80, "System Agent", "open mac apps (safe-list)", "#34d399")
-    box(820, 440, 220, 80, "Conversation", "free-form via Brain", "#34d399")
+    box(820, 90, 220, 70, "Time Agent", "clock / date / day", "#34d399")
+    box(820, 170, 220, 70, "Weather Agent", "OpenWeather API", "#34d399")
+    box(820, 250, 220, 70, "System Agent", "open mac apps", "#34d399")
+    box(820, 330, 220, 70, "Computer Agent", "click / type / scroll (CUA)", "#34d399")
+    box(820, 410, 220, 70, "Code Agent", "writes code to sandbox", "#34d399")
+    box(820, 490, 220, 70, "Hermes Skills × 98", "unique-keyword catalogue", "#34d399")
 
     box(420, 560, 320, 100, "Speaker", "TTS  →  audible reply", "#f472b6")
 
     arrow(180, 230, 180, 260)
     arrow(180, 350, 180, 380)
     arrow(300, 425, 420, 315)
-    arrow(740, 315, 820, 180)
-    arrow(740, 315, 820, 280)
-    arrow(740, 315, 820, 380)
-    arrow(740, 315, 820, 480)
+    arrow(740, 315, 820, 125)
+    arrow(740, 315, 820, 205)
+    arrow(740, 315, 820, 285)
+    arrow(740, 315, 820, 365)
+    arrow(740, 315, 820, 445)
+    arrow(740, 315, 820, 525)
     arrow(580, 370, 580, 410)
     arrow(580, 500, 580, 560)
-    arrow(820, 480, 740, 605, color="#64748b")
+    arrow(820, 525, 740, 605, color="#64748b")
 
     d.text((40, 680), "user voice  →  listener  →  orchestrator  →  agent  →  speaker  →  user",
            fill="#64748b", font=_font(16))
@@ -112,25 +116,29 @@ def make_terminal_demo() -> None:
 
     lines = [
         ("$ python main.py", "#7ee787"),
-        ("                 HARRY — voice-only agentic assistant", "#e6edf3"),
-        ("       say 'harry, ...' to wake.  Ctrl+C to exit.", "#6e7681"),
+        ("            HARRY — voice-only agentic assistant", "#e6edf3"),
+        ("    brain: claude-code   ·   say 'harry, ...' to wake.", "#6e7681"),
         ("", "#e6edf3"),
-        ("[listening...]", "#6e7681"),
-        ("heard: harry what time is it    (confidence 0.94)", "#7ee787"),
-        ("agent: time", "#d2a8ff"),
-        ("harry: The time is 1:07 AM, sir.", "#79c0ff"),
+        ("heard: harry what time is it    (0.94)", "#7ee787"),
+        ("agent: time          harry: The time is 1:07 AM, sir.", "#79c0ff"),
         ("", "#e6edf3"),
-        ("[listening...]", "#6e7681"),
-        ("heard: harry weather in coimbatore    (confidence 0.91)", "#7ee787"),
-        ("agent: weather", "#d2a8ff"),
-        ("harry: It is 28 degrees and clear sky in Coimbatore, sir.", "#79c0ff"),
+        ("heard: harry tell a joke    (0.93)", "#7ee787"),
+        ("agent: hermes-skills harry: I tried writing a pun, sir,", "#79c0ff"),
+        ("                     but it had no punchline.", "#79c0ff"),
         ("", "#e6edf3"),
-        ("[listening...]", "#6e7681"),
-        ("heard: harry mumble mumble    (confidence 0.18)", "#f0883e"),
-        ("harry: I am not certain I understood. Please say that again, sir.", "#79c0ff"),
-        ("heard: harry open safari    (confidence 0.97)", "#7ee787"),
-        ("agent: system", "#d2a8ff"),
-        ("harry: Opening Safari, sir.", "#79c0ff"),
+        ("heard: harry roll a dice    (0.96)", "#7ee787"),
+        ("agent: hermes-skills harry: You rolled a 4, sir.", "#79c0ff"),
+        ("", "#e6edf3"),
+        ("heard: harry click at 480 320    (0.92)", "#7ee787"),
+        ("agent: computer     harry: Clicking at 480, 320, sir.", "#79c0ff"),
+        ("", "#e6edf3"),
+        ("heard: harry code python that reverses a string", "#7ee787"),
+        ("       into reverse.py    (0.89)", "#7ee787"),
+        ("agent: code         harry: I have written 3 lines into", "#79c0ff"),
+        ("                    .harry/workspace/reverse.py, sir.", "#79c0ff"),
+        ("", "#e6edf3"),
+        ("heard: harry mumble mumble    (0.18)", "#f0883e"),
+        ("harry: I am not certain I understood. Please say that again.", "#79c0ff"),
     ]
 
     y = 70
