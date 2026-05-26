@@ -7,6 +7,11 @@
 (function () {
   const EN = window.HARRY_GREETINGS;
   const TA = window.HARRY_GREETINGS_TA;
+  if (!EN) return; // nothing to wrap — bail rather than crash the page
+
+  // Capture the ORIGINAL pick before monkey-patching so the new pick can
+  // delegate to it without recursing into itself.
+  const originalEnPick = EN.pick.bind(EN);
 
   let lang = "en";          // "en" | "ta" | "auto"
   let nameOverride = null;
@@ -28,16 +33,13 @@
   }
 
   function pickGreeting(seed) {
-    const useTA = pickLang() === "ta" && TA;
-    return (useTA ? TA : EN).pick(seed);
+    if (pickLang() === "ta" && TA) return TA.pick(seed);
+    return originalEnPick(seed);
   }
 
-  // Patch the global HARRY_GREETINGS.pick to be bilingual without changing app.jsx
-  if (EN) {
-    const originalAll = EN.all.slice();
-    EN.pick = pickGreeting;
-    EN.all = originalAll.concat(TA ? TA.all : []);
-  }
+  const originalAll = EN.all.slice();
+  EN.pick = pickGreeting;
+  EN.all = originalAll.concat(TA ? TA.all : []);
 
   window.HARRY_LANG = {
     current: () => lang,
