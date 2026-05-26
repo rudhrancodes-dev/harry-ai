@@ -121,16 +121,45 @@ def runtime_python() -> Path:
     return RUNTIME / "bin" / "python3"
 
 
-def is_runtime_ready() -> bool:
+def clean_env_for_venv(extra: dict[str, str] | None = None) -> dict[str, str]:
+    """Return an env dict safe to use when invoking the venv python.
+
+    When Harry.app is launched via LaunchServices, the parent process is
+    macOS's `launchd`. The framework Python that the bash shim execs
+    sets __PYVENV_LAUNCHER__ — and that env var, if inherited by a child
+    venv python, makes the child use the parent's sys.prefix instead of
+    its own. The venv suddenly can't find packages installed inside it.
+    That's exactly the false-positive 'harry.server still can't import'
+    alert we were hitting.
+
+    We also drop PYTHONHOME and PYTHONPATH for the same reason."""
+    env = os.environ.copy()
+    for key in ("__PYVENV_LAUNCHER__", "PYTHONHOME", "PYTHONPATH",
+                "PYTHONEXECUTABLE", "PYTHONSTARTUP"):
+        env.pop(key, None)
+    if extra:
+        env.update(extra)
+    return env
+
+
+def is_runtime_ready() -> tuple[bool, str]:
+    """Returns (ok, detail). detail explains *why* on failure."""
     py = runtime_python()
     if not py.exists():
-        return False
+        return False, f"venv python missing: {py}"
     try:
-        subprocess.check_output([str(py), "-c", "import harry.server"],
-                                timeout=8, stderr=subprocess.STDOUT)
-        return True
-    except Exception:
-        return False
+        out = subprocess.check_output(
+            [str(py), "-c", "import harry.server; print('OK')"],
+            env=clean_env_for_venv(),
+            timeout=20, stderr=subprocess.STDOUT,
+        ).decode(errors="replace").strip()
+        return ("OK" in out), out
+    except subprocess.CalledProcessError as e:
+        return False, (e.output or b"").decode(errors="replace")
+    except subprocess.TimeoutExpired:
+        return False, "import harry.server timed out after 20 s"
+    except Exception as e:
+        return False, f"{type(e).__name__}: {e}"
 
 
 def install_runtime() -> bool:
@@ -155,6 +184,7 @@ def install_runtime() -> bool:
     if not RUNTIME.exists():
         log.write("creating venv…\n")
         r = subprocess.run([system_py, "-m", "venv", str(RUNTIME)],
+                           env=clean_env_for_venv(),
                            stdout=log, stderr=log)
         if r.returncode != 0:
             alert("Setup failed", "Could not create the Python venv. "
@@ -164,8 +194,9 @@ def install_runtime() -> bool:
     progress("Harry", "Installing dependencies… first launch takes a minute.")
 
     py = str(runtime_python())
+    venv_env = clean_env_for_venv()
     subprocess.run([py, "-m", "pip", "install", "--upgrade", "pip"],
-                   stdout=log, stderr=log)
+                   env=venv_env, stdout=log, stderr=log)
 
     wheels = sorted(WHEEL_DIR.glob("*.whl")) if WHEEL_DIR.exists() else []
     if wheels:
@@ -185,11 +216,11 @@ def install_runtime() -> bool:
             "websockets>=12.0",
         ]
         r = subprocess.run([py, "-m", "pip", "install", str(wheels[0]),
-                            *deps], stdout=log, stderr=log)
+                            *deps], env=venv_env, stdout=log, stderr=log)
     else:
         log.write("no bundled wheel; falling back to PyPI\n")
         r = subprocess.run([py, "-m", "pip", "install", "harry-jarvis"],
-                           stdout=log, stderr=log)
+                           env=venv_env, stdout=log, stderr=log)
 
     if r.returncode != 0:
         # Show the last 20 lines of the log so the user sees the real error
@@ -217,9 +248,7 @@ def install_runtime() -> bool:
 
 def start_server() -> subprocess.Popen:
     """Spawn uvicorn as a direct child so TCC attributes prompts to us."""
-    env = os.environ.copy()
-    env.setdefault("HARRY_HOST", "127.0.0.1")
-    env.setdefault("HARRY_PORT", str(PORT))
+    extras = {"HARRY_HOST": "127.0.0.1", "HARRY_PORT": str(PORT)}
     # Load env from ~/.config/harry/.env if present so users can pre-set
     # OPENROUTER_API_KEY etc. without editing Application Support.
     user_env = Path.home() / ".config" / "harry" / ".env"
@@ -228,7 +257,8 @@ def start_server() -> subprocess.Popen:
             line = line.strip()
             if line and not line.startswith("#") and "=" in line:
                 k, v = line.split("=", 1)
-                env.setdefault(k.strip(), v.strip())
+                extras.setdefault(k.strip(), v.strip())
+    env = clean_env_for_venv(extras)
     log = LOG_FILE.open("a", buffering=1)
     log.write(f"\n=== server up {time.strftime('%H:%M:%S')} on {URL} ===\n")
     return subprocess.Popen(
@@ -299,20 +329,65 @@ def open_accessibility_pane() -> None:
 
 # ── main ──────────────────────────────────────────────────────────────────
 
+def _log(msg: str) -> None:
+    APP_SUPPORT.mkdir(parents=True, exist_ok=True)
+    with LOG_FILE.open("a", buffering=1) as f:
+        f.write(f"[launcher {time.strftime('%H:%M:%S')}] {msg}\n")
+
+
 def main() -> int:
-    if not is_runtime_ready():
+    APP_SUPPORT.mkdir(parents=True, exist_ok=True)
+    _log("launcher start")
+
+    ok, detail = is_runtime_ready()
+    if not ok:
+        _log(f"first runtime check: NOT ready ({detail.strip()[:200]})")
         if not install_runtime():
             return 1
-        if not is_runtime_ready():
-            alert("Setup failed",
-                  "The runtime installed but harry.server still can't import. "
-                  "See ~/Library/Application Support/Harry/harry.log")
-            return 1
+        # Retry the verification a few times — pyobjc-heavy installs can
+        # take a beat for the file-system metadata to settle on a cold
+        # filesystem cache.
+        for attempt in range(3):
+            ok, detail = is_runtime_ready()
+            if ok:
+                _log(f"runtime ready after attempt {attempt + 1}")
+                break
+            _log(f"post-install check {attempt + 1} failed: {detail.strip()[:300]}")
+            time.sleep(1.0)
+        if not ok:
+            # Last-ditch: the import didn't pass our explicit check, but
+            # pip exited 0 and state.json was written. Try to start the
+            # server anyway and surface its real stderr if it crashes.
+            _log("post-install check failed three times; "
+                 "starting server anyway to see its real error.")
 
     permission_preflight()
 
     proc = start_server()
     threading.Thread(target=wait_and_open, daemon=True).start()
+
+    # Give the server 5 s to either become healthy or die loudly.
+    deadline = time.time() + 5.0
+    while time.time() < deadline:
+        if proc.poll() is not None:
+            break
+        try:
+            with urllib.request.urlopen(URL + "/api/health", timeout=0.4):
+                _log("server healthy")
+                break
+        except Exception:
+            time.sleep(0.3)
+
+    if proc.poll() is not None and proc.returncode != 0:
+        try:
+            tail = "\n".join(LOG_FILE.read_text().splitlines()[-25:])
+        except OSError:
+            tail = "(log unreadable)"
+        alert("Harry could not start",
+              f"The server exited with code {proc.returncode}.\\n\\n"
+              f"Last log lines:\\n{tail[:600]}\\n\\n"
+              f"Full log: ~/Library/Application Support/Harry/harry.log")
+        return proc.returncode
 
     try:
         proc.wait()
