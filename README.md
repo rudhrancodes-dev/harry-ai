@@ -18,28 +18,43 @@
 
 ## Install
 
-**The one-liner** — clones, sets up a venv, installs Harry, runs onboarding, builds the `.app`:
+### Recommended — `Harry.dmg` (self-installing, no terminal)
+
+1. Download **[Harry.dmg](https://github.com/rudhrancodes-dev/harry-ai/releases/download/v0.2.0/Harry.dmg)** from the [Releases page](https://github.com/rudhrancodes-dev/harry-ai/releases).
+2. Open the DMG and drag **Harry** to your Applications folder.
+3. Double-click **Harry**. The first launch shows a native notification *"Setting up your runtime…"* — Harry creates a Python venv at `~/Library/Application Support/Harry/runtime/`, pip-installs the bundled wheel + all dependencies, then opens the UI in your default browser.
+4. macOS will ask for **Microphone**, **Speech Recognition**, and **Apple Events** permission. The prompts attribute to **Harry** (not Terminal) because the launcher spawns python as a direct child of the .app bundle. For **Accessibility** (cursor/keystroke control), you'll be nudged to System Settings → Privacy & Security on first computer-use action.
+
+Subsequent launches just boot the server (~1 s) and open the browser. Harry runs locally at `http://127.0.0.1:7424`.
+
+### Power users — one-line installer
+
+For people who'd rather have the repo on disk and develop against it:
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/rudhrancodes-dev/harry-ai/main/install.sh | bash
 ```
 
-After it finishes, launch in either way:
+Then:
 
 ```bash
 harry                    # CLI (opens the UI in your browser)
-open ~/Applications/Harry.app    # native double-click
 ```
 
-**Already cloned?**
+### Manual
 
 ```bash
+git clone https://github.com/rudhrancodes-dev/harry-ai.git
+cd harry-ai && python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 harry-onboard --yes
 harry
 ```
 
-**Want the desktop app only?** Grab `Harry.dmg` from the [Releases page](https://github.com/rudhrancodes-dev/harry-ai/releases), mount it, drag `Harry.app` to `/Applications`. It still expects the install location at `~/Apps/harry-ai` (run the one-liner first).
+### Requirements
+
+- macOS 11 (Big Sur) or newer.
+- Python 3.10–3.13 (the launcher prefers `python.org` framework installs; it skips 3.14 because pyobjc / PyAudio wheels lag that version). If none is found, you'll be prompted to install via [python.org](https://python.org) or `brew install python`.
 
 ---
 
