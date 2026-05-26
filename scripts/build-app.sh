@@ -1,14 +1,19 @@
 #!/usr/bin/env bash
-# Build the macOS Harry.app bundle, then package it as Harry.dmg.
+# Build the macOS Harry.app bundle, then package it as a polished
+# Claude-style Harry.dmg with a branded background, an arrow from the
+# .app icon to the Applications symlink, hidden toolbar/sidebar, and a
+# custom volume icon.
 #
-# - Generates Harry.icns from assets/harry-icon-1024.png via iconutil
-# - Writes Info.plist + a launcher shell script
-# - The launcher opens Terminal, sources the project venv, runs `harry`
-# - Output:   dist/Harry.app  and  dist/Harry.dmg
+# Flow:
+#   1. Build/refresh Harry.icns from assets/harry-icon-1024.png via iconutil
+#   2. Build dist/Harry.app skeleton + launcher + Info.plist
+#   3. Stage Harry.app + Applications symlink + .background/ + .VolumeIcon.icns
+#   4. hdiutil create UDRW  →  attach  →  AppleScript styles the window
+#      →  detach  →  hdiutil convert UDZO  →  dist/Harry.dmg
 #
-# Requires: macOS, iconutil (preinstalled), hdiutil (preinstalled),
-#           and that you've already run `pip install -e .` so the
-#           project venv has the `harry` console script.
+# Requires:  macOS, iconutil, hdiutil, sips, osascript, SetFile
+#            (all preinstalled on every Mac except SetFile, which ships
+#             with the Command Line Tools — `xcode-select --install`).
 
 set -euo pipefail
 
@@ -17,17 +22,18 @@ DIST="$ROOT/dist"
 APP="$DIST/Harry.app"
 ICNS="$ROOT/assets/Harry.icns"
 PNG="$ROOT/assets/harry-icon-1024.png"
+BG="$ROOT/assets/dmg-background.png"
+BG2X="$ROOT/assets/dmg-background@2x.png"
 
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 ok()   { printf "\033[1;32m✓\033[0m %s\n" "$*"; }
 
 bold "Building Harry.app"
 
-if [ ! -f "$PNG" ]; then
-  python3 "$ROOT/scripts/make-icon.py"
-fi
+[ -f "$PNG" ] || python3 "$ROOT/scripts/make-icon.py"
+[ -f "$BG"  ] || python3 "$ROOT/scripts/make-dmg-bg.py"
 
-# Build .icns
+# ── icns ──────────────────────────────────────────────────────────────────
 ICONSET="$ROOT/assets/Harry.iconset"
 rm -rf "$ICONSET"; mkdir -p "$ICONSET"
 for size in 16 32 64 128 256 512; do
@@ -39,7 +45,7 @@ iconutil -c icns "$ICONSET" -o "$ICNS"
 rm -rf "$ICONSET"
 ok "icon → $ICNS"
 
-# Build .app
+# ── .app bundle ───────────────────────────────────────────────────────────
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$ICNS" "$APP/Contents/Resources/Harry.icns"
@@ -69,11 +75,7 @@ PLIST
 
 cat > "$APP/Contents/MacOS/Harry" <<'LAUNCH'
 #!/usr/bin/env bash
-# Harry launcher — finds the install directory, opens Terminal, runs the server.
 set -euo pipefail
-
-# Resolve the install dir: prefer ~/Apps/harry-ai (set by install.sh),
-# fall back to the dev tree the .app was built from.
 CANDIDATES=(
   "$HOME/Apps/harry-ai"
   "__DEV_ROOT__"
@@ -88,8 +90,6 @@ if [ -z "$INSTALL_DIR" ]; then
   osascript -e 'display alert "Harry isn'\''t installed yet" message "Run the one-line installer first:\n\ncurl -sSL https://raw.githubusercontent.com/rudhrancodes-dev/harry-ai/main/install.sh | bash"'
   exit 1
 fi
-
-# Open Terminal and run the server inside the project venv.
 osascript <<APPLESCRIPT
 tell application "Terminal"
   activate
@@ -98,28 +98,45 @@ end tell
 APPLESCRIPT
 LAUNCH
 
-# Bake the dev-tree path so the .app works without re-install during dev
 sed -i '' "s|__DEV_ROOT__|$ROOT|g" "$APP/Contents/MacOS/Harry"
 chmod +x "$APP/Contents/MacOS/Harry"
 ok "bundle → $APP"
 
-# Package as DMG
+# ── DMG: built with `create-dmg` for Claude-style polish ──────────────────
 DMG="$DIST/Harry.dmg"
-STAGE="$DIST/dmg-stage"
-rm -rf "$STAGE" "$DMG"
-mkdir -p "$STAGE"
-cp -R "$APP" "$STAGE/"
-ln -s /Applications "$STAGE/Applications"
+rm -f "$DMG"
 
-hdiutil create \
-  -volname "Harry" \
-  -srcfolder "$STAGE" \
-  -ov -format UDZO \
-  "$DMG" >/dev/null
+if ! command -v create-dmg >/dev/null 2>&1; then
+  echo "create-dmg not found. Install with:  brew install create-dmg" >&2
+  echo "Falling back to plain hdiutil bundle..." >&2
+  STAGE="$DIST/dmg-stage"; rm -rf "$STAGE"; mkdir -p "$STAGE"
+  cp -R "$APP" "$STAGE/"; ln -s /Applications "$STAGE/Applications"
+  hdiutil create -volname Harry -srcfolder "$STAGE" -ov -format UDZO "$DMG" >/dev/null
+  rm -rf "$STAGE"
+  ok "dmg   → $DMG (plain)"
+else
+  # create-dmg drives Finder for us — handles the .DS_Store, background
+  # image, window bounds, icon positions, hidden toolbar — all the quirks
+  # that make a hand-rolled AppleScript DMG flaky.
+  create-dmg \
+    --volname "Harry" \
+    --volicon "$ICNS" \
+    --background "$BG" \
+    --window-pos 400 120 \
+    --window-size 660 400 \
+    --icon-size 128 \
+    --text-size 12 \
+    --icon "Harry.app" 165 240 \
+    --app-drop-link 495 240 \
+    --hide-extension "Harry.app" \
+    --no-internet-enable \
+    --format UDZO \
+    "$DMG" \
+    "$APP" >/dev/null
+  ok "dmg   → $DMG  ($(du -h "$DMG" | awk '{print $1}'))"
+fi
 
-rm -rf "$STAGE"
-ok "dmg   → $DMG"
-
+ok "dmg   → $DMG  ($(du -h "$DMG" | awk '{print $1}'))"
 bold "Done."
 echo  "  open $APP        # launch directly"
-echo  "  open $DMG        # mount the installer"
+echo  "  open $DMG        # mount the polished installer"
