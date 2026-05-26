@@ -1,11 +1,13 @@
 """Entry point — runs Harry's voice loop.
 
-Flow per turn:
-  1. Listen for a phrase from the microphone.
-  2. If nothing was heard, loop quietly.
-  3. If speech was heard but not understood, ask the user to repeat (up to N rounds).
-  4. Optionally require the wake word ("harry ...") before responding.
-  5. Hand the utterance to the orchestrator and speak its reply.
+Routing priority (first match wins):
+  TimeAgent          – clock / date
+  WeatherAgent       – local weather lookups
+  SystemAgent        – open mac apps from a safe list
+  ComputerAgent      – cursor / keyboard / scroll via cliclick
+  CodeAgent          – "code python that ... into foo.py"  →  saves a file
+  HermesSkillAgent   – 98 narrow skills with unique trigger phrases
+  ConversationAgent  – free-form fallback through the configured Brain
 """
 from __future__ import annotations
 
@@ -15,49 +17,56 @@ import sys
 from rich.console import Console
 
 from harry.agents import (
+    CodeAgent,
+    ComputerAgent,
     ConversationAgent,
     Orchestrator,
     SystemAgent,
     TimeAgent,
     WeatherAgent,
 )
-from harry.brain import Brain
+from harry.brain import load_brain
 from harry.config import load_config
+from harry.skills import HermesSkillAgent
 from harry.voice import Listener, Speaker
 
 console = Console()
 
 
-def banner() -> None:
+def banner(brain_name: str) -> None:
     console.print(
         "[bold cyan]HARRY[/bold cyan] — voice-only agentic assistant",
         justify="center",
     )
-    console.print("[dim]say 'harry, ...' to wake.  Ctrl+C to exit.[/dim]\n")
+    console.print(f"[dim]brain: {brain_name}   ·   say 'harry, ...' to wake.  Ctrl+C to exit.[/dim]\n")
 
 
 def main() -> int:
     config = load_config()
+    brain = load_brain()
+
     listener = Listener(
         energy_threshold=config.stt_energy_threshold,
         pause_threshold=config.stt_pause_threshold,
     )
     speaker = Speaker()
-    brain = Brain(api_key=config.anthropic_api_key, model=config.model)
     orchestrator = Orchestrator(
         [
             TimeAgent(),
             WeatherAgent(api_key=config.openweather_api_key),
             SystemAgent(),
+            ComputerAgent(),
+            CodeAgent(brain=brain),
+            HermesSkillAgent(brain=brain),
             ConversationAgent(brain=brain),
         ]
     )
 
-    banner()
-    speaker.say("Harry online. Standing by, sir.")
+    banner(brain.name)
+    speaker.say("Harry online. Standing by.")
 
     def shutdown(_signum, _frame):
-        speaker.say("Powering down. Goodbye, sir.")
+        speaker.say("Powering down. Goodbye.")
         sys.exit(0)
 
     signal.signal(signal.SIGINT, shutdown)
@@ -68,9 +77,8 @@ def main() -> int:
 
         if not transcription.heard_anything:
             continue
-
         if not transcription.text:
-            speaker.say("I did not catch that, sir. Could you repeat?")
+            speaker.say("I did not catch that. Could you repeat?")
             continue
 
         utterance = transcription.text.lower()
@@ -82,12 +90,12 @@ def main() -> int:
 
         payload = utterance.split(config.wake_word, 1)[-1].strip(" ,.;:!?")
         if not payload:
-            speaker.say("Yes, sir?")
+            speaker.say("Yes?")
             continue
 
         rounds = 0
         while transcription.confidence < 0.35 and rounds < config.max_clarification_rounds:
-            speaker.say("I am not certain I understood. Please say that again, sir.")
+            speaker.say("I am not certain I understood. Please say that again.")
             transcription = listener.listen()
             if not transcription.text:
                 rounds += 1
